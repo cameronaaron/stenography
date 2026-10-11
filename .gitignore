@@ -1,0 +1,8 @@
+__pycache__/
+.DS_Store
+.env
+storage.json
+logs/
+output/
+stegobot.log
+cloud-init.yml

@@ -1,0 +1,49 @@
+#cloud-config
+users:
+  - name: discordbot
+    homedir: /opt/discordbot
+    groups: users, sudo
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA... you@example.com
+
+packages:
+  - python3
+  - python3-pip
+  - python3-venv
+  - git
+  - libpq-dev
+
+write_files:
+  - path: /opt/discordbot/.ssh/id_rsa
+    permissions: '0600'
+    content: |
+      REPLACE_WITH_DEPLOY_KEY  # the bot repo deploy key; keep the real file out of git
+
+runcmd:
+  # Set permissions for SSH key
+  - chown discordbot:discordbot /opt/discordbot/.ssh/id_rsa
+  - chmod 600 /opt/discordbot/.ssh/id_rsa
+
+  # Update the system
+  - apt-get update && apt-get upgrade -y
+
+  # Set up Python environment with error handling
+  - set +e  # Continue on error
+  - su - discordbot -c "python3 -m venv /opt/discordbot/discord-bot/venv"
+  - su - discordbot -c "/opt/discordbot/discord-bot/venv/bin/pip install --upgrade pip"
+
+  # Improved Git clone/pull with fetch
+  - su - discordbot -c "cd /opt/discordbot && (git clone git@github.com:cameronaaron/stenography.git discord-bot || (cd discord-bot && git fetch --all && git reset --hard origin/main && git pull))"
+
+  # More resilient pip installation
+  - su - discordbot -c "cd /opt/discordbot/discord-bot && /opt/discordbot/discord-bot/venv/bin/pip install --no-cache-dir -r requirements.txt || /opt/discordbot/discord-bot/venv/bin/pip install --no-dependencies -r requirements.txt"
+
+  # Ensure the bot starts even if some dependencies failed
+  - printf "[Unit]\nDescription=Discord Bot\nAfter=network.target\n\n[Service]\nType=simple\nUser=discordbot\nWorkingDirectory=/opt/discordbot/discord-bot\nExecStart=/opt/discordbot/discord-bot/venv/bin/python3 /opt/discordbot/discord-bot/discordbot.py\nRestart=always\nRestartSec=10\n\n[Install]\nWantedBy=multi-user.target\n" > /etc/systemd/system/discordbot.service
+  - systemctl enable discordbot
+  - systemctl start discordbot || true
+  - set -e  # Restore error handling
+
+final_message: "Setup completed - check service status with 'systemctl status discordbot'"

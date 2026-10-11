@@ -1,0 +1,10 @@
+discord.py
+aiohttp
+dnspython
+python-dotenv
+numpy
+Pillow
+scipy
+cryptography
+reedsolo
+argon2-cffi
